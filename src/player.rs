@@ -1,8 +1,5 @@
-use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
+use bevy::{input::mouse::MouseWheel, prelude::*};
 use std::f32::consts::FRAC_PI_2;
-
-use crate::{PLAYER, WALLS};
 
 pub struct PlayerPlugin;
 
@@ -23,23 +20,14 @@ const PLAYERSPEED: f32 = 150.;
 fn setup_player(mut commands: Commands, assets: Res<AssetServer>) {
     commands.spawn((
         Player,
-        Transform::from_xyz(0., 0., 1.),
+        Transform::from_xyz(0., 0., 3.),
         Sprite::from_image(assets.load("player.png")),
-        // Für Collision
-        RigidBody::KinematicPositionBased,
-        // Zum Steuern
-        KinematicCharacterController::default(),
-        // Die Collision form
-        Collider::ball(20.),
-        // Die gruppe (Ich bin, Ich erkenne)
-        CollisionGroups::new(PLAYER, WALLS),
     ));
 
     commands.spawn((Camera2d, Transform::from_scale(Vec3::splat(0.5))));
 }
 
 fn move_player(
-    mut player_controller: Query<&mut KinematicCharacterController, With<Player>>,
     mut player: Single<&mut Transform, With<Player>>,
     time: Res<Time>,
     kb: Res<ButtonInput<KeyCode>>,
@@ -62,9 +50,7 @@ fn move_player(
         input.x += 1.;
     }
 
-    for mut controller in player_controller.iter_mut() {
-        controller.translation = Some(input.normalize_or_zero() * PLAYERSPEED * time.delta_secs());
-    }
+    player.translation += (input.normalize_or_zero() * PLAYERSPEED * time.delta_secs()).extend(3.);
 
     // Rotation
     let (camera, camera_transform) = *camera_query;
@@ -84,11 +70,17 @@ fn update_camera(
     mut camera: Single<&mut Transform, (With<Camera2d>, Without<Player>)>,
     player: Single<&Transform, (With<Player>, Without<Camera2d>)>,
     time: Res<Time>,
+    mut scroll_event: EventReader<MouseWheel>,
 ) {
     let Vec3 { x, y, .. } = player.translation;
     let direction = Vec3::new(x, y, camera.translation.z);
 
     camera
         .translation
-        .smooth_nudge(&direction, CAMERA_DECAY_RATE, time.delta_secs())
+        .smooth_nudge(&direction, CAMERA_DECAY_RATE, time.delta_secs());
+
+    for event in scroll_event.read() {
+        camera.scale += Vec3::splat(event.y * -0.2);
+        camera.scale = Vec3::splat(camera.scale.x.clamp(0.5, 100.));
+    }
 }

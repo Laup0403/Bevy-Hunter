@@ -1,5 +1,6 @@
 use crate::player::Player;
 use bevy::prelude::*;
+use bevy_rapier2d::prelude::*;
 
 pub struct ShootPlugin;
 
@@ -7,7 +8,7 @@ impl Plugin for ShootPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<ShootEvent>()
             .add_systems(Startup, load_weapons)
-            .add_systems(Update, (bullet_spawner, move_bullet, switch_weapon, shoot));
+            .add_systems(Update, (bullet_spawner, switch_weapon, shoot));
     }
 }
 
@@ -38,31 +39,27 @@ struct Weapon {
 
 // Inventar
 #[derive(Component)]
-struct Inventory{
+struct Inventory {
     weapons: Vec<Weapon>,
     selected: usize,
 }
 
-fn load_weapons(
-    mut commands: Commands,
-){
-    commands.spawn(
-        Inventory {
-            weapons: vec![
-                Weapon{
-                    name: "Glock".to_string(),
-                    fire_mode: FireMode::Single,
-                    enabled: true
-                },
-                Weapon{
-                    name: "Ak-47".to_string(),
-                    fire_mode: FireMode::Single,
-                    enabled: true
-                }
-            ],
-            selected: 0,
-        }
-    );
+fn load_weapons(mut commands: Commands) {
+    commands.spawn(Inventory {
+        weapons: vec![
+            Weapon {
+                name: "Glock".to_string(),
+                fire_mode: FireMode::Single,
+                enabled: true,
+            },
+            Weapon {
+                name: "Ak-47".to_string(),
+                fire_mode: FireMode::Single,
+                enabled: true,
+            },
+        ],
+        selected: 0,
+    });
 }
 
 fn bullet_spawner(
@@ -86,15 +83,18 @@ fn bullet_spawner(
                 Bullet {
                     velocity: dir * 600.,
                 },
+                // Movement controlled by rapier
+                RigidBody::Dynamic,
+                Velocity {
+                    linvel: dir * 600.,
+                    ..Default::default()
+                },
+                GravityScale(0.0),
+                Collider::ball(2.),
+                ActiveEvents::COLLISION_EVENTS,
+                Sensor::default(),
             ));
         }
-    }
-}
-
-fn move_bullet(time: Res<Time>, mut query: Query<(&mut Transform, &Bullet)>) {
-    for (mut transform, bullet) in &mut query {
-        transform.translation.x += bullet.velocity.x * time.delta_secs();
-        transform.translation.y += bullet.velocity.y * time.delta_secs();
     }
 }
 
@@ -104,15 +104,17 @@ fn shoot(mouse: Res<ButtonInput<MouseButton>>, mut shoot_event: EventWriter<Shoo
     }
 }
 
-fn switch_weapon(
-    kb: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut Inventory>,
-) {
-    let Ok(mut inventory) = query.get_single_mut() else { return; };
+fn switch_weapon(kb: Res<ButtonInput<KeyCode>>, mut query: Query<&mut Inventory>) {
+    let Ok(mut inventory) = query.get_single_mut() else {
+        return;
+    };
 
     if kb.just_pressed(KeyCode::KeyE) {
         inventory.selected = (inventory.selected + 1) % inventory.weapons.len();
-        println!("Waffe gewechselt zu: {}", inventory.weapons[inventory.selected].name);
+        println!(
+            "Weapon switched to: {}",
+            inventory.weapons[inventory.selected].name
+        );
     }
 
     if kb.just_pressed(KeyCode::KeyQ) {
@@ -121,6 +123,9 @@ fn switch_weapon(
         } else {
             inventory.selected -= 1;
         }
-        println!("Waffe gewechselt zu: {}", inventory.weapons[inventory.selected].name);
+        println!(
+            "Weapon switched to: {}",
+            inventory.weapons[inventory.selected].name
+        );
     }
 }
