@@ -6,7 +6,8 @@ pub struct ShootPlugin;
 impl Plugin for ShootPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<ShootEvent>()
-            .add_systems(Update, (shoot, bullet_spawner, move_bullet));
+            .add_systems(Startup, load_weapons)
+            .add_systems(Update, (bullet_spawner, move_bullet, switch_weapon, shoot));
     }
 }
 
@@ -19,6 +20,50 @@ pub struct Bullet {
 // Das event wenn gefeuert wurde
 #[derive(Event)]
 struct ShootEvent;
+
+// Der Feuer mode
+#[derive(Component)]
+enum FireMode {
+    Single,
+    Auto,
+}
+
+// Waffen vorlage
+#[derive(Component)]
+struct Weapon {
+    name: String,
+    fire_mode: FireMode,
+    enabled: bool,
+}
+
+// Inventar
+#[derive(Component)]
+struct Inventory{
+    weapons: Vec<Weapon>,
+    selected: usize,
+}
+
+fn load_weapons(
+    mut commands: Commands,
+){
+    commands.spawn(
+        Inventory {
+            weapons: vec![
+                Weapon{
+                    name: "Glock".to_string(),
+                    fire_mode: FireMode::Single,
+                    enabled: true
+                },
+                Weapon{
+                    name: "Ak-47".to_string(),
+                    fire_mode: FireMode::Single,
+                    enabled: true
+                }
+            ],
+            selected: 0,
+        }
+    );
+}
 
 fn bullet_spawner(
     mut commands: Commands,
@@ -46,15 +91,36 @@ fn bullet_spawner(
     }
 }
 
+fn move_bullet(time: Res<Time>, mut query: Query<(&mut Transform, &Bullet)>) {
+    for (mut transform, bullet) in &mut query {
+        transform.translation.x += bullet.velocity.x * time.delta_secs();
+        transform.translation.y += bullet.velocity.y * time.delta_secs();
+    }
+}
+
 fn shoot(mouse: Res<ButtonInput<MouseButton>>, mut shoot_event: EventWriter<ShootEvent>) {
     if mouse.just_pressed(MouseButton::Left) {
         shoot_event.send(ShootEvent);
     }
 }
 
-fn move_bullet(time: Res<Time>, mut query: Query<(&mut Transform, &Bullet)>) {
-    for (mut transform, bullet) in &mut query {
-        transform.translation.x += bullet.velocity.x * time.delta_secs();
-        transform.translation.y += bullet.velocity.y * time.delta_secs();
+fn switch_weapon(
+    kb: Res<ButtonInput<KeyCode>>,
+    mut query: Query<&mut Inventory>,
+) {
+    let Ok(mut inventory) = query.get_single_mut() else { return; };
+
+    if kb.just_pressed(KeyCode::KeyE) {
+        inventory.selected = (inventory.selected + 1) % inventory.weapons.len();
+        println!("Waffe gewechselt zu: {}", inventory.weapons[inventory.selected].name);
+    }
+
+    if kb.just_pressed(KeyCode::KeyQ) {
+        if inventory.selected == 0 {
+            inventory.selected = inventory.weapons.len() - 1;
+        } else {
+            inventory.selected -= 1;
+        }
+        println!("Waffe gewechselt zu: {}", inventory.weapons[inventory.selected].name);
     }
 }
