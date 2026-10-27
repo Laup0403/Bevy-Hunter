@@ -2,13 +2,14 @@ use crate::GameAssets;
 use crate::player::Player;
 use bevy::prelude::*;
 use rand::random_range;
+use std::f32::consts::TAU;
 
 pub struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<SpawnEnemy>()
-            .add_systems(Update, (spawn_enemy, move_enemy));
+            .add_systems(Update, (spawn_enemy, move_enemy, enemy_spawn_system));
     }
 }
 
@@ -18,9 +19,12 @@ impl Plugin for EnemyPlugin {
 pub struct Enemy;
 
 #[derive(Message)]
-struct SpawnEnemy;
+struct SpawnEnemy {
+    position: Vec2,
+}
 
 const ENEMYSPEED: f32 = 40.;
+const MAX_ENEMIES: usize = 2000;
 
 fn spawn_enemy(
     mut commands: Commands,
@@ -34,10 +38,10 @@ fn spawn_enemy(
         3 => assets.bird3.clone(),
         _ => assets.bird4.clone(), // 4 und alle anderen weil random noch nicht bestimmt ist
     };
-    for _ in enemy_message.read() {
+    for msg in enemy_message.read() {
         commands.spawn((
             Enemy,
-            Transform::from_xyz(0., 0., 1.0),
+            Transform::from_xyz(msg.position.x, msg.position.y, 1.0),
             Sprite::from_image(texture.clone()),
         ));
     }
@@ -50,27 +54,47 @@ fn move_enemy(
     mut enemy_message: MessageWriter<SpawnEnemy>,
     time: Res<Time>,
 ) {
-    if kb.pressed(KeyCode::Space) {
-        enemy_message.write(SpawnEnemy);
+    if kb.just_pressed(KeyCode::Space) {
+        enemy_message.write(SpawnEnemy {
+            position: Vec2 { x: 0., y: 0. },
+        });
     }
 
     let mut num = 0;
 
-    for mut enemy_transform in &mut enemy_query {
+    /*for mut enemy_transform in &mut enemy_query {
         let to_player =
             (player_query.translation.xy() - enemy_transform.translation.xy()).normalize();
         enemy_transform.translation.x += to_player.x * ENEMYSPEED * time.delta_secs();
         enemy_transform.translation.y += to_player.y * ENEMYSPEED * time.delta_secs();
         num += 1;
-    }
-    println!("{}", player_query.translation.x.to_string());
-    //println!("Enemies: {}", num.to_string());
+    }*/
+    println!("Enemies: {}", num.to_string());
 }
 
 fn enemy_spawn_system(
-    mut enemy_message: MessageReader<SpawnEnemy>,
+    mut enemy_message: MessageWriter<SpawnEnemy>,
+    enemies: Query<&Transform, (With<Enemy>, Without<Player>)>,
     player: Single<&Transform, With<Player>>,
 ) {
-    let spawn_x = random_range((player.translation.x - 500.)..(player.translation.x + 500.));
-    let spawn_y = random_range((player.translation.y - 500.)..(player.translation.y + 500.));
+    let num_enemies: usize = enemies.iter().len();
+
+    if num_enemies >= MAX_ENEMIES {
+        return;
+    }
+
+    for _ in 0..10 {
+        let angle = random_range(0.0..TAU);
+        let distance = random_range(50.0..400.0);
+
+        let spawn =
+            player.translation.truncate() + (Vec2::new(angle.cos(), angle.sin()) * distance);
+
+        enemy_message.write(SpawnEnemy {
+            position: Vec2 {
+                x: spawn.x,
+                y: spawn.y,
+            },
+        });
+    }
 }
