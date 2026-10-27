@@ -1,22 +1,21 @@
-use crate::{player::Player, shoot::Bullet};
+use crate::GameAssets;
+use crate::player::Player;
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
+use rand::random_range;
 
 pub struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<EnemyEvent>()
-            .add_systems(Update, (spawn_enemy, move_enemy, kill_enemy));
+            .add_systems(Update, (spawn_enemy, move_enemy, check_bullet));
     }
 }
 
 // Siehe Shoot und Player
 
 #[derive(Component)]
-struct Enemy {
-    health: f32,
-}
+pub struct Enemy;
 
 #[derive(Event)]
 struct EnemyEvent;
@@ -25,81 +24,44 @@ const ENEMYSPEED: f32 = 40.;
 
 fn spawn_enemy(
     mut commands: Commands,
-    assets: Res<AssetServer>,
+    assets: Res<GameAssets>,
     mut enemy_event: EventReader<EnemyEvent>,
 ) {
+    let random: i32 = random_range(1..=4);
+    let texture = match random {
+        1 => assets.bird1.clone(),
+        2 => assets.bird2.clone(),
+        3 => assets.bird3.clone(),
+        _ => assets.bird4.clone(), // 4 und alle anderen weil random noch nicht bestimmt ist
+    };
     for _ in enemy_event.read() {
         commands.spawn((
-            Enemy { health: 20. },
+            Enemy,
             Transform::from_xyz(0., 0., 1.0),
-            Sprite::from_image(assets.load("zombie.png")),
-            RigidBody::KinematicPositionBased,
-            KinematicCharacterController::default(),
-            Collider::ball(20.),
-            ActiveEvents::COLLISION_EVENTS,
-            Sensor::default(),
+            Sprite::from_image(texture.clone()),
         ));
     }
 }
 
 fn move_enemy(
-    mut enemy_query: Query<
-        (&mut Transform, &mut KinematicCharacterController),
-        (With<Enemy>, Without<Player>),
-    >,
+    mut enemy_query: Query<&mut Transform, (With<Enemy>, Without<Player>)>,
     player_query: Single<&Transform, With<Player>>,
     kb: Res<ButtonInput<KeyCode>>,
     mut enemy_event: EventWriter<EnemyEvent>,
     time: Res<Time>,
 ) {
-    if kb.just_pressed(KeyCode::Space) {
+    if kb.pressed(KeyCode::Space) {
         enemy_event.send(EnemyEvent);
     }
 
-    let player_translation = player_query.translation.xy();
+    let mut num = 0;
 
-    for (mut transform, mut controller) in &mut enemy_query {
-        // Rotate to player
-        let to_player = (player_translation - transform.translation.xy()).normalize();
-        let rotate_to_player = Quat::from_rotation_arc(Vec3::Y, to_player.extend(0.));
-        transform.rotation = rotate_to_player;
-
-        // Move to player
-        controller.translation = Some(to_player * ENEMYSPEED * time.delta_secs());
+    for mut enemy_transform in &mut enemy_query {
+        let to_player =
+            (player_query.translation.xy() - enemy_transform.translation.xy()).normalize();
+        enemy_transform.translation.x += to_player.x * ENEMYSPEED * time.delta_secs();
+        enemy_transform.translation.y += to_player.y * ENEMYSPEED * time.delta_secs();
+        num += 1;
     }
-}
-
-fn kill_enemy(
-    mut commands: Commands,
-    mut collision_events: EventReader<CollisionEvent>,
-    bullet_query: Query<&Bullet>,
-    mut enemy_query: Query<&mut Enemy>,
-) {
-    for event in collision_events.read() {
-        // Checken ob collision startet
-        if let CollisionEvent::Started(entity1, entity2, _flags) = event {
-            // Schauen ob bullet und enemy collidiert sind
-            let (bullet, enemy) =
-                if bullet_query.contains(*entity1) && enemy_query.contains(*entity2) {
-                    (*entity1, *entity2)
-                } else if bullet_query.contains(*entity2) && enemy_query.contains(*entity1) {
-                    (*entity2, *entity1)
-                } else {
-                    continue;
-                };
-
-            if let Some(entity_commands) = commands.get_entity(bullet) {
-                entity_commands.despawn_recursive();
-            }
-            if let Ok(mut enemy_obj) = enemy_query.get_mut(enemy) {
-                enemy_obj.health -= 10.;
-
-                if enemy_obj.health <= 0.
-                    && let Some(entity_commands) = commands.get_entity(enemy)
-                {
-                    entity_commands.despawn_recursive();
-                }
-            }
-        }
-    }
+    println!("Enemies: {}", num.to_string());
 }
