@@ -63,5 +63,14 @@ fn move_enemy(
         enemy_transform.translation.y += to_player.y * ENEMYSPEED * time.delta_secs();
         num += 1;
     }
-    println!("Enemies: {}", num.to_string());
+    println!("{}", player_query.translation.x.to_string());
+    //println!("Enemies: {}", num.to_string());
+}
+
+fn enemy_spawn_system(
+    mut enemy_message: MessageReader<SpawnEnemy>,
+    player: Single<&Transform, With<Player>>,
+) {
+    let spawn_x = random_range((player.translation.x - 500.)..(player.translation.x + 500.));
+    let spawn_y = random_range((player.translation.y - 500.)..(player.translation.y + 500.));
 }
