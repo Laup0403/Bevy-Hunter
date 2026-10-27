@@ -84,7 +84,7 @@ fn update_camera(
     mut camera: Single<&mut Transform, (With<Camera2d>, Without<Player>)>,
     player: Single<&Transform, (With<Player>, Without<Camera2d>)>,
     time: Res<Time>,
-    mut scroll_event: EventReader<MouseWheel>,
+    mut scroll_event: MessageReader<MouseWheel>,
 ) {
     let Vec3 { x, y, .. } = player.translation;
     let direction = Vec3::new(x, y, camera.translation.z);

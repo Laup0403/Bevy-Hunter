@@ -6,8 +6,7 @@ pub struct ShootPlugin;
 
 impl Plugin for ShootPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<ShootEvent>()
-            .add_systems(Update, (bullet_spawner, move_bullet, shoot, check_bullet));
+        app.add_systems(Update, (bullet_spawner, move_bullet, check_bullet));
     }
 }
 
@@ -17,18 +16,13 @@ pub struct Bullet {
     velocity: Vec2,
 }
 
-// Das event wenn gefeuert wurde
-#[derive(Event)]
-struct ShootEvent;
-
 fn bullet_spawner(
     mut commands: Commands,
     assets: Res<GameAssets>,
     gun_query: Query<&Transform, With<Gun>>,
-    mut shoot_event: EventReader<ShootEvent>,
+    mouse: Res<ButtonInput<MouseButton>>,
 ) {
-    // Wenn shoot event kommt
-    for _ in shoot_event.read() {
+    if mouse.just_pressed(MouseButton::Left) {
         for transform in &gun_query {
             let dir = transform.up().truncate().normalize();
             let spawn = transform.translation.truncate() + dir * 2.0;
@@ -51,13 +45,7 @@ fn move_bullet(time: Res<Time>, mut query: Query<(&mut Transform, &Bullet)>) {
     }
 }
 
-fn shoot(mouse: Res<ButtonInput<MouseButton>>, mut shoot_event: EventWriter<ShootEvent>) {
-    if mouse.just_pressed(MouseButton::Left) {
-        shoot_event.send(ShootEvent);
-    }
-}
-
-fn check_bullet(
+pub fn check_bullet(
     bullet_query: Query<(Entity, &Transform), With<Bullet>>,
     mut enemy_query: Query<(Entity, &mut Transform), (With<Enemy>, Without<Bullet>)>,
     mut commands: Commands,
@@ -90,7 +78,7 @@ fn check_bullet(
             if bullet_pos.distance_squared(enemy_pos) < 20. {
                 // als tot kugel makieren
                 used_bullets.insert(bullet);
-                commands.entity(bullet).despawn_recursive();
+                commands.entity(bullet).despawn();
                 is_dead = true;
                 break;
             }
@@ -98,7 +86,7 @@ fn check_bullet(
 
         // if is dead despawn
         if is_dead {
-            commands.entity(enemy).despawn_recursive();
+            commands.entity(enemy).despawn();
         }
     }
 }
