@@ -25,7 +25,7 @@ fn bullet_spawner(
     gun_query: Query<&Transform, With<Gun>>,
     mouse: Res<ButtonInput<MouseButton>>,
 ) {
-    if mouse.pressed(MouseButton::Left) {
+    if mouse.just_pressed(MouseButton::Left) || mouse.pressed(MouseButton::Right) {
         for transform in &gun_query {
             let dir = transform.up().truncate().normalize();
             let spawn = transform.translation.truncate() + dir * 2.0;
