@@ -1,6 +1,6 @@
-use crate::gamemanager::GameAssets;
+use crate::gamemanager::{GameAssets, GameState};
 use crate::player::Player;
-use bevy::prelude::*;
+use bevy::{input::mouse::MouseWheel, prelude::*};
 use rand::random_range;
 use std::f32::consts::TAU;
 
@@ -8,9 +8,10 @@ pub struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_message::<SpawnEnemy>()
-            .add_systems(Startup, spawn_all_enemies)
-            .add_systems(Update, (move_enemy, enemy_respawn));
+        app.insert_resource(MaxEnemies(0)).add_systems(
+            Update,
+            (move_enemy, enemy_respawn, change_max).run_if(in_state(GameState::InGame)),
+        );
     }
 }
 
@@ -19,17 +20,11 @@ impl Plugin for EnemyPlugin {
 #[derive(Component)]
 pub struct Enemy;
 
-#[derive(Message)]
-struct SpawnEnemy {
-    position: Vec2,
-}
-
 const ENEMYSPEED: f32 = 10.;
-pub const MAX_ENEMIES: usize = 100000;
-// Spawnes per frame
-const SPF: usize = 20;
+#[derive(Resource)]
+pub struct MaxEnemies(pub usize);
 
-fn spawn_enemy(position: Vec2, mut commands: &mut Commands, assets: &Res<GameAssets>) {
+fn spawn_enemy(position: Vec2, commands: &mut Commands, assets: &Res<GameAssets>) {
     let random: i32 = random_range(1..=4);
     let texture = match random {
         1 => assets.bird1.clone(),
@@ -47,16 +42,8 @@ fn spawn_enemy(position: Vec2, mut commands: &mut Commands, assets: &Res<GameAss
 fn move_enemy(
     mut enemy_query: Query<&mut Transform, (With<Enemy>, Without<Player>)>,
     player_query: Single<&Transform, With<Player>>,
-    kb: Res<ButtonInput<KeyCode>>,
-    mut enemy_message: MessageWriter<SpawnEnemy>,
     time: Res<Time>,
 ) {
-    if kb.just_pressed(KeyCode::Space) {
-        enemy_message.write(SpawnEnemy {
-            position: Vec2 { x: 0., y: 0. },
-        });
-    }
-
     for mut enemy_transform in &mut enemy_query {
         let to_player =
             (player_query.translation.xy() - enemy_transform.translation.xy()).normalize();
@@ -70,14 +57,21 @@ fn enemy_respawn(
     player: Single<&Transform, With<Player>>,
     mut commands: Commands,
     assets: Res<GameAssets>,
+    max_enemies: Res<MaxEnemies>,
 ) {
     let num_enemies: usize = enemies.iter().len();
 
-    if num_enemies >= MAX_ENEMIES - SPF {
+    if num_enemies >= max_enemies.0 {
         return;
     }
 
-    for _ in 0..SPF {
+    let spawn_rate = if max_enemies.0 - num_enemies <= 1000 {
+        max_enemies.0 - num_enemies
+    } else {
+        1000
+    };
+
+    for _ in 0..spawn_rate {
         let angle = random_range(0.0..TAU);
         let distance = random_range(50.0..700.0);
 
@@ -88,22 +82,22 @@ fn enemy_respawn(
     }
 }
 
-fn spawn_all_enemies(
-    mut enemy_message: MessageWriter<SpawnEnemy>,
-    player: Single<&Transform, With<Player>>,
+fn change_max(
+    mut scroll_event: MessageReader<MouseWheel>,
+    mut max_enemies: ResMut<MaxEnemies>,
+    enemies: Query<Entity, With<Enemy>>,
+    mut commands: Commands,
 ) {
-    for _ in 0..MAX_ENEMIES {
-        let angle = random_range(0.0..TAU);
-        let distance = random_range(50.0..700.0);
-
-        let spawn =
-            player.translation.truncate() + (Vec2::new(angle.cos(), angle.sin()) * distance);
-
-        enemy_message.write(SpawnEnemy {
-            position: Vec2 {
-                x: spawn.x,
-                y: spawn.y,
-            },
-        });
+    for event in scroll_event.read() {
+        let delta = (event.y * 1000.).round() as i32;
+        if delta > 0 {
+            max_enemies.0 = max_enemies.0.saturating_add(delta as usize);
+        } else if delta < 0 {
+            let sub = delta.unsigned_abs() as usize;
+            max_enemies.0 = max_enemies.0.saturating_sub(sub);
+        }
+        for entity in enemies {
+            commands.entity(entity).despawn();
+        }
     }
 }

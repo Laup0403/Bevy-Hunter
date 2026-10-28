@@ -1,13 +1,17 @@
-use crate::gamemanager::GameAssets;
-use bevy::{input::mouse::MouseWheel, prelude::*};
+use crate::gamemanager::{GameAssets, GameState};
+use bevy::prelude::*;
 use std::f32::consts::FRAC_PI_2;
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_player)
-            .add_systems(Update, (move_player, update_camera).chain());
+        app.add_systems(Startup, setup_player).add_systems(
+            Update,
+            (move_player, update_camera)
+                .chain()
+                .run_if(in_state(GameState::InGame)),
+        );
     }
 }
 
@@ -84,7 +88,7 @@ fn update_camera(
     mut camera: Single<&mut Transform, (With<Camera2d>, Without<Player>)>,
     player: Single<&Transform, (With<Player>, Without<Camera2d>)>,
     time: Res<Time>,
-    mut scroll_event: MessageReader<MouseWheel>,
+    kb: Res<ButtonInput<KeyCode>>,
 ) {
     let Vec3 { x, y, .. } = player.translation;
     let direction = Vec3::new(x, y, camera.translation.z);
@@ -93,8 +97,12 @@ fn update_camera(
         .translation
         .smooth_nudge(&direction, CAMERA_DECAY_RATE, time.delta_secs());
 
-    for event in scroll_event.read() {
-        camera.scale += Vec3::splat(event.y * -0.2);
+    if kb.pressed(KeyCode::KeyE) {
+        camera.scale += Vec3::splat(-0.02);
+        camera.scale = Vec3::splat(camera.scale.x.clamp(0.2, 1.6));
+    }
+    if kb.pressed(KeyCode::KeyQ) {
+        camera.scale += Vec3::splat(0.02);
         camera.scale = Vec3::splat(camera.scale.x.clamp(0.2, 1.6));
     }
 }

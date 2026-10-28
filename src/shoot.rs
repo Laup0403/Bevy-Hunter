@@ -1,4 +1,4 @@
-use crate::gamemanager::GameAssets;
+use crate::gamemanager::{GameAssets, GameState};
 use crate::{enemy::Enemy, player::Gun, player::Player};
 use bevy::prelude::*;
 
@@ -6,7 +6,10 @@ pub struct ShootPlugin;
 
 impl Plugin for ShootPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (bullet_spawner, move_bullet, check_bullet));
+        app.add_systems(
+            Update,
+            (bullet_spawner, move_bullet, check_bullet).run_if(in_state(GameState::InGame)),
+        );
     }
 }
 

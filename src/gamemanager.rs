@@ -1,4 +1,4 @@
-use crate::enemy::{Enemy, MAX_ENEMIES};
+use crate::enemy::{Enemy, MaxEnemies};
 use bevy::{
     color::palettes::css::{BLACK, GOLD, GRAY},
     diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
@@ -9,10 +9,18 @@ pub struct Gamemanager;
 
 impl Plugin for Gamemanager {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreStartup, load_assets)
+        app.init_state::<GameState>()
+            .add_systems(PreStartup, load_assets)
             .add_systems(Startup, load_ui)
-            .add_systems(Update, (update_fps, update_birds));
+            .add_systems(Update, (update_fps, update_birds, update_max));
     }
+}
+
+#[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub enum GameState {
+    #[default]
+    Menu,
+    InGame,
 }
 
 #[derive(Resource)]
@@ -49,6 +57,9 @@ struct FPSCounter;
 #[derive(Component)]
 struct BirdCounter;
 
+#[derive(Component)]
+struct MaxBirds;
+
 fn load_ui(mut commands: Commands) {
     commands
         .spawn((
@@ -81,7 +92,8 @@ fn load_ui(mut commands: Commands) {
             TextBackgroundColor(BG_COLOR.into()),
         ))
         .with_child((
-            TextSpan::new(MAX_ENEMIES.to_string()),
+            MaxBirds,
+            TextSpan::default(),
             TextColor(NUMBER_COLOR.into()),
             TextBackgroundColor(BG_COLOR.into()),
         ));
@@ -108,5 +120,11 @@ fn update_birds(birds: Query<&Enemy>, mut query: Query<&mut TextSpan, With<BirdC
 
     for mut span in &mut query {
         **span = format!("{num}");
+    }
+}
+
+fn update_max(mut query: Query<&mut TextSpan, With<MaxBirds>>, max_enemies: Res<MaxEnemies>) {
+    for mut span in &mut query {
+        **span = format!("{}", max_enemies.0.to_string());
     }
 }
