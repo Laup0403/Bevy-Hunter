@@ -12,7 +12,8 @@ impl Plugin for Gamemanager {
         app.init_state::<GameState>()
             .add_systems(PreStartup, load_assets)
             .add_systems(Startup, load_ui)
-            .add_systems(Update, (update_fps, update_birds, update_max));
+            .add_systems(Update, (update_fps, update_birds, update_max))
+            .add_systems(Update, switch_state.run_if(in_state(GameState::InGame)));
     }
 }
 
@@ -126,5 +127,11 @@ fn update_birds(birds: Query<&Enemy>, mut query: Query<&mut TextSpan, With<BirdC
 fn update_max(mut query: Query<&mut TextSpan, With<MaxBirds>>, max_enemies: Res<MaxEnemies>) {
     for mut span in &mut query {
         **span = format!("{}", max_enemies.0.to_string());
+    }
+}
+
+fn switch_state(mut commands: Commands, kb: Res<ButtonInput<KeyCode>>) {
+    if kb.just_pressed(KeyCode::Tab) {
+        commands.set_state(GameState::Menu);
     }
 }

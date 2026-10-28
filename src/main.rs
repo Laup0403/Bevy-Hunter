@@ -14,7 +14,18 @@ use menu::MenuPlugin;
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::srgb(0.45, 0.57, 0.2145)))
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugins(
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Bevy Hunter".to_string(),
+                        present_mode: bevy::window::PresentMode::Immediate,
+                        ..default()
+                    }),
+                    ..default()
+                }),
+        )
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .add_plugins((
             Gamemanager,
