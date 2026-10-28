@@ -10,7 +10,7 @@ impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<SpawnEnemy>()
             .add_systems(Startup, spawn_all_enemies)
-            .add_systems(Update, (spawn_enemy, move_enemy, enemy_respawn));
+            .add_systems(Update, (move_enemy, enemy_respawn));
     }
 }
 
@@ -29,11 +29,7 @@ pub const MAX_ENEMIES: usize = 100000;
 // Spawnes per frame
 const SPF: usize = 20;
 
-fn spawn_enemy(
-    mut commands: Commands,
-    assets: Res<GameAssets>,
-    mut enemy_message: MessageReader<SpawnEnemy>,
-) {
+fn spawn_enemy(position: Vec2, mut commands: &mut Commands, assets: &Res<GameAssets>) {
     let random: i32 = random_range(1..=4);
     let texture = match random {
         1 => assets.bird1.clone(),
@@ -41,13 +37,11 @@ fn spawn_enemy(
         3 => assets.bird3.clone(),
         _ => assets.bird4.clone(), // 4 und alle anderen weil random noch nicht bestimmt ist
     };
-    for msg in enemy_message.read() {
-        commands.spawn((
-            Enemy,
-            Transform::from_xyz(msg.position.x, msg.position.y, 1.0),
-            Sprite::from_image(texture.clone()),
-        ));
-    }
+    commands.spawn((
+        Enemy,
+        Transform::from_xyz(position.x, position.y, 1.0),
+        Sprite::from_image(texture.clone()),
+    ));
 }
 
 fn move_enemy(
@@ -72,9 +66,10 @@ fn move_enemy(
 }
 
 fn enemy_respawn(
-    mut enemy_message: MessageWriter<SpawnEnemy>,
     enemies: Query<&Transform, (With<Enemy>, Without<Player>)>,
     player: Single<&Transform, With<Player>>,
+    mut commands: Commands,
+    assets: Res<GameAssets>,
 ) {
     let num_enemies: usize = enemies.iter().len();
 
@@ -89,12 +84,7 @@ fn enemy_respawn(
         let spawn =
             player.translation.truncate() + (Vec2::new(angle.cos(), angle.sin()) * distance);
 
-        enemy_message.write(SpawnEnemy {
-            position: Vec2 {
-                x: spawn.x,
-                y: spawn.y,
-            },
-        });
+        spawn_enemy(spawn, &mut commands, &assets);
     }
 }
 
