@@ -1,4 +1,4 @@
-use crate::GameAssets;
+use crate::gamemanager::GameAssets;
 use bevy::{input::mouse::MouseWheel, prelude::*};
 use std::f32::consts::FRAC_PI_2;
 

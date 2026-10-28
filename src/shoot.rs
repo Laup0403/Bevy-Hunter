@@ -1,5 +1,5 @@
-use crate::GameAssets;
-use crate::{enemy::Enemy, player::Gun};
+use crate::gamemanager::GameAssets;
+use crate::{enemy::Enemy, player::Gun, player::Player};
 use bevy::prelude::*;
 
 pub struct ShootPlugin;
@@ -22,7 +22,7 @@ fn bullet_spawner(
     gun_query: Query<&Transform, With<Gun>>,
     mouse: Res<ButtonInput<MouseButton>>,
 ) {
-    if mouse.just_pressed(MouseButton::Left) {
+    if mouse.pressed(MouseButton::Left) {
         for transform in &gun_query {
             let dir = transform.up().truncate().normalize();
             let spawn = transform.translation.truncate() + dir * 2.0;
@@ -46,9 +46,13 @@ fn move_bullet(time: Res<Time>, mut query: Query<(&mut Transform, &Bullet)>) {
 }
 
 pub fn check_bullet(
-    bullet_query: Query<(Entity, &Transform), With<Bullet>>,
-    mut enemy_query: Query<(Entity, &mut Transform), (With<Enemy>, Without<Bullet>)>,
+    bullet_query: Query<(Entity, &Transform), (With<Bullet>, Without<Player>)>,
+    mut enemy_query: Query<
+        (Entity, &mut Transform),
+        (With<Enemy>, Without<Bullet>, Without<Player>),
+    >,
     mut commands: Commands,
+    player: Single<&Transform, With<Player>>,
 ) {
     // alle bullets sammeln in einem vec aus dem enitiy und dem transform
     let bullets: Vec<(Entity, Vec2)> = bullet_query
@@ -87,6 +91,16 @@ pub fn check_bullet(
         // if is dead despawn
         if is_dead {
             commands.entity(enemy).despawn();
+        }
+    }
+
+    for &(bullet, pos) in &bullets {
+        if pos.x >= player.translation.x + 400.
+            || pos.x <= player.translation.x - 400.
+            || pos.y >= player.translation.y + 400.
+            || pos.y <= player.translation.y - 400.
+        {
+            commands.entity(bullet).despawn();
         }
     }
 }
